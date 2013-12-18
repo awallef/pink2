@@ -45,6 +45,20 @@
     };
     
     /***
+    *       _____             .___     .__   
+    *      /     \   ____   __| _/____ |  |  
+    *     /  \ /  \ /  _ \ / __ |/ __ \|  |  
+    *    /    Y    (  <_> ) /_/ \  ___/|  |__
+    *    \____|__  /\____/\____ |\___  >____/
+    *            \/            \/    \/      
+    */
+    
+    var Models = {
+        STEP_ANGLE              : Math.PI / 18,
+        speed                   : 2
+    };
+    
+    /***
     *    _________                __                .__  .__                
     *    \_   ___ \  ____   _____/  |________  ____ |  | |  |   ___________ 
     *    /    \  \/ /  _ \ /    \   __\_  __ \/  _ \|  | |  | _/ __ \_  __ \
@@ -62,7 +76,14 @@
         CREATE_PERSON           : 'CREATE_PERSON',
         CREATE_SCENE            : 'CREATE_SCENE',
         START_RENDERER          : 'START_RENDERER',
-        LOOP                    : 'LOOP'
+        LOOP                    : 'LOOP',
+        TOOGLE_CAMERA           : 'TOOGLE_CAMERA',
+        UP                      : 'UP',
+        DOWN                    : 'DOWN',
+        LEFT                    : 'LEFT',
+        RIGHT                   : 'RIGHT',
+        SPEED_UP                : 'SPEED_UP',
+        SPEED_DOWN              : 'SPEED_DOWN'
     };
     
     /* Loop
@@ -89,10 +110,117 @@
         // animate flamingo
         var delta = rendering.clock.getDelta();
         flamingo.updateAnimation(1000 * delta);
+        flamingo.translateOnAxis(new THREE.Vector3(0, 0, 1), Models.speed / 10);
         
         // render!
         rendering.renderer.render(rendering.scene, rendering.currentCamera);
         
+    };
+    
+    /* Flamingo controlls
+    *******************************************/
+    function Up( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    Up.prototype = new better.AbstractCommand;
+    Up.prototype.constructor = Up;
+    
+    Up.prototype.execute = function( notification )
+    {    
+        // retrieve All needed objects
+        var mediator = this.facade.retrieveMediator( Mediator.FLAMINGO );
+        var flamingo = mediator.viewComponent;
+
+        // animate flamingo
+        flamingo.rotateOnAxis(new THREE.Vector3(1, 0, 0), Models.STEP_ANGLE);
+        
+    };
+    
+    function Down( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    Down.prototype = new better.AbstractCommand;
+    Down.prototype.constructor = Down;
+    
+    Down.prototype.execute = function( notification )
+    {    
+        // retrieve All needed objects
+        var mediator = this.facade.retrieveMediator( Mediator.FLAMINGO );
+        var flamingo = mediator.viewComponent;
+
+        // animate flamingo
+        flamingo.rotateOnAxis(new THREE.Vector3(1, 0, 0), -Models.STEP_ANGLE);
+        
+    };
+    
+    function Left( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    Left.prototype = new better.AbstractCommand;
+    Left.prototype.constructor = Left;
+    
+    Left.prototype.execute = function( notification )
+    {    
+        // retrieve All needed objects
+        var mediator = this.facade.retrieveMediator( Mediator.FLAMINGO );
+        var flamingo = mediator.viewComponent;
+
+        // animate flamingo
+         flamingo.rotateOnAxis(new THREE.Vector3(0, 0, 1), -Models.STEP_ANGLE);
+        
+    };
+    
+    function Right( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    Right.prototype = new better.AbstractCommand;
+    Right.prototype.constructor = Right;
+    
+    Right.prototype.execute = function( notification )
+    {    
+        // retrieve All needed objects
+        var mediator = this.facade.retrieveMediator( Mediator.FLAMINGO );
+        var flamingo = mediator.viewComponent;
+
+        // animate flamingo
+        flamingo.rotateOnAxis(new THREE.Vector3(0, 0, 1), Models.STEP_ANGLE);
+        
+    };
+    
+    function SpeedUp( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    SpeedUp.prototype = new better.AbstractCommand;
+    SpeedUp.prototype.constructor = SpeedUp;
+    
+    SpeedUp.prototype.execute = function( notification )
+    {    
+        Models.speed += 0.1;  
+    };
+    
+    function SpeedDown( note )
+    {
+        better.AbstractCommand.call(this, note );
+    };
+
+    SpeedDown.prototype = new better.AbstractCommand;
+    SpeedDown.prototype.constructor = SpeedDown;
+    
+    SpeedDown.prototype.execute = function( notification )
+    {    
+        Models.speed -= 0.1;  
+        if( Models.speed >= 0 )
+            Models.speed = 0;
     };
     
     /* Start Render
@@ -124,19 +252,36 @@
     Load3DModel.prototype.execute = function( notification )
     {    
        
-       if( !notification.body.models )
-           alert( 'Load3DModel ( command ) : Array "models" of Notification\'s body is either empty or not set');
+        if( !notification.body.models )
+            alert( 'Load3DModel ( command ) : Array "models" of Notification\'s body is either empty or not set');
        
-        var model = notification.body.models.shift();
-        var loader = new THREE.JSONLoader();
         var instance = this;
-        loader.load( model , function(geometry, materials) { 
-            
-            instance.notification.body.geometry = geometry;
-            instance.notification.body.materials = materials;
-            instance.nextCommand();
-            
-        } );
+        var model = notification.body.models.shift();
+        var loader, texture;
+        
+        if( model.lastIndexOf('.js') != -1 ){
+            loader = new THREE.JSONLoader();
+            loader.load( model , function(geometry, materials) { 
+                instance.notification.body.geometry = geometry;
+                instance.notification.body.materials = materials;
+                instance.nextCommand();
+
+            } );
+        }
+        
+        if( model.lastIndexOf('.obj') != -1 ){
+            texture = notification.body.textures.shift();
+            loader = new THREE.OBJMTLLoader();
+            loader.load( model, texture, function ( object ) {
+                instance.notification.body.object = object;
+                instance.nextCommand();
+
+            } );
+        }
+        
+        
+        
+        
     };
     
     /* Create Scene Lights etc
@@ -182,9 +327,9 @@
 
         // Scene
         var scene = rendering.scene;
-        scene.fog = new THREE.Fog(0xffffff, 1, 5000);
+        scene.fog = new THREE.Fog(0x55CAE7, 1, 5000);
         scene.fog.color.setHSL(0.6, 0, 1);
-
+        
         // flamingo
         scene.add(flamingo);
 
@@ -192,15 +337,13 @@
         scene.add(person);
 
         // LIGHTS
-
         var hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
         hemiLight.color.setHSL(0.6, 1, 0.6);
         hemiLight.groundColor.setHSL(0.095, 1, 0.75);
         hemiLight.position.set(0, 500, 0);
         scene.add(hemiLight);
-
+        
         //
-
         var dirLight = new THREE.DirectionalLight(0xffffff, 1);
         dirLight.color.setHSL(0.1, 1, 0.95);
         dirLight.position.set(-1, 1.75, 1);
@@ -223,7 +366,9 @@
         dirLight.shadowBias = -0.0001;
         dirLight.shadowDarkness = 0.35;
         //dirLight.shadowCameraVisible = true;
-
+           
+            
+            
         // GROUND
 
         var groundGeo = new THREE.PlaneGeometry(10000, 10000);
@@ -238,7 +383,6 @@
         ground.receiveShadow = true;
 
         // SKYDOME
-
         var vertexShader = document.getElementById('vertexShader').textContent;
         var fragmentShader = document.getElementById('fragmentShader').textContent;
         var uniforms = {
@@ -256,7 +400,7 @@
 
         var sky = new THREE.Mesh(skyGeo, skyMat);
         scene.add(sky);
-
+        
         
         // RENDERER
 
@@ -288,9 +432,7 @@
     var Mediator = {
         FLAMINGO            : 'FLAMINGO',
         PERSON              : 'PERSON',
-        RENDER              : 'RENDER',
-        START_RENDER        : 'START_RENDER',
-        TOOGLE_CAMERA       : 'TOOGLE_CAMERA'
+        RENDER              : 'RENDER'
     };
     
     /* Flamingo
@@ -329,6 +471,7 @@
         this.viewComponent.receiveShadow = true;
         this.viewComponent.position.set(0, 40, 60);
         this.viewComponent.scale.set(0.5, 0.5, 0.5);
+        this.viewComponent.rotation.y = -Math.PI;
     };
     
     /* Person
@@ -350,19 +493,19 @@
     {
         if( notification.name == Notification.CREATE_PERSON )
         {
-            this.create( notification.body.geometry, notification.body.materials );
+            this.create( notification.body.object );
             this.facade.nextCommand( notification );
         }    
     };
 
-    Person.prototype.create = function ( geometry, materials )
+    Person.prototype.create = function ( object )
     {
-        this.viewComponent = new THREE.MorphAnimMesh(geometry, new THREE.MeshFaceMaterial(materials));
+        this.viewComponent = object;
         this.viewComponent.castShadow = true;
         this.viewComponent.receiveShadow = true;
-        this.viewComponent.position.set(0, 0, 0);
-        this.viewComponent.scale.set(3, 3, 3);
-        this.viewComponent.rotation.x = -Math.PI / 2;
+        this.viewComponent.position.set( 0, 0, -300 );
+        this.viewComponent.scale.set(80, 80, 80);
+        //this.viewComponent.rotation.y = -Math.PI;
     };
     
     /* Scene
@@ -433,6 +576,9 @@
     *     \___  /  (____  /\___  >____  /\____ |\___  >
     *         \/        \/     \/     \/      \/    \/ 
     */
+    var Services = {
+        KEY_HANDLER              : 'KEY_HANDLER'
+    };
     
     function Facade()
     {
@@ -444,6 +590,10 @@
     }
 
     Facade.prototype.constructor = Facade;
+    
+    Facade.prototype.initServices = function(configObject) {
+        this.registerService( Services.KEY_HANDLER , better.KeyHandlerService, configObject);
+    };
     
     Facade.prototype.initMediators = function(configObject)
     {
@@ -460,6 +610,13 @@
         this.registerCommand( Notification.CREATE_SCENE, SceneCreation );
         this.registerCommand( Notification.START_RENDERER, StartRenderer );
         this.registerCommand( Notification.LOOP, Loop );
+        
+        this.registerCommand( Notification.UP, Up );
+        this.registerCommand( Notification.DOWN, Down );
+        this.registerCommand( Notification.LEFT, Left );
+        this.registerCommand( Notification.RIGHT, Right );
+        this.registerCommand( Notification.SPEED_UP, SpeedUp );
+        this.registerCommand( Notification.SPEED_DOWN, SpeedDown );
     };
     
     Facade.prototype.initProcesses = function(configObject)
@@ -477,6 +634,18 @@
         ]);
     };
     
+    Facade.prototype.initHandlers = function(configObject)
+    {
+        this.registerKeyHandler( Notification.TOOGLE_CAMERA , 'c', new better.Notification( Notification.TOOGLE_CAMERA, {} ), 'all');
+        
+        this.registerKeyHandler( Notification.UP , 'up', new better.Notification( Notification.UP, {} ), 'all');
+        this.registerKeyHandler( Notification.DOWN , 'down', new better.Notification( Notification.DOWN, {} ), 'all');
+        this.registerKeyHandler( Notification.LEFT , 'left', new better.Notification( Notification.LEFT, {} ), 'all');
+        this.registerKeyHandler( Notification.RIGHT , 'right', new better.Notification( Notification.RIGHT, {} ), 'all');
+        this.registerKeyHandler( Notification.SPEED_UP , 'a', new better.Notification( Notification.SPEED_UP, {} ), 'all');
+        this.registerKeyHandler( Notification.SPEED_DOWN , 'd', new better.Notification( Notification.SPEED_DOWN, {} ), 'all');
+    };
+    
     Facade.prototype.initSequences = function(configObject)
     {
         this.registerAnimationFrameJob( Notification.LOOP, new better.Notification( Notification.LOOP, {} ) );
@@ -487,7 +656,10 @@
         this.goTo(  Process.INIT, { 
             models : [
                 "models/pink/flamingo.js",
-                "models/Girl/girl.js"
+                "models/Lara3/lara.obj"
+            ],
+            textures : [
+                "models/Lara3/lara.mtl"
             ]
         } );
     };
